@@ -37,6 +37,7 @@ module SoilBiogeochemDecompCascadeConType
      logical           , pointer  :: is_microbe(:)                     ! TRUE => pool is a microbe pool
      logical           , pointer  :: is_litter(:)                      ! TRUE => pool is a litter pool
      logical           , pointer  :: is_soil(:)                        ! TRUE => pool is a soil pool
+     logical           , pointer  :: is_doc(:)                         ! TRUE => pool is dissolved organic carbon
      logical           , pointer  :: is_cwd(:)                         ! TRUE => pool is a cwd pool
      real(r8)          , pointer  :: initial_cn_ratio(:)               ! c:n ratio for initialization of pools
      real(r8)          , pointer  :: initial_stock(:)                  ! initial concentration for seeding at spinup
@@ -153,6 +154,10 @@ contains
        ndecomp_cascade_transitions = 7
        ndecomp_pools_max           = 8
     end if
+
+    ndecomp_pools = ndecomp_pools + 2 ! Add 2 extra pools for DOC
+    ndecomp_pools_max = ndecomp_pools_max + 2 ! Add 2 extra pools for DOC
+
     ! Set ndecomp_pools_vr needed for Matrix solution
 
   end subroutine decomp_cascade_par_init
@@ -189,6 +194,7 @@ contains
        allocate(decomp_cascade_con%is_microbe(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%is_litter(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%is_soil(ibeg:ndecomp_pools))
+       allocate(decomp_cascade_con%is_doc(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%is_cwd(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%initial_cn_ratio(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%initial_stock(ibeg:ndecomp_pools))
@@ -215,6 +221,7 @@ contains
        decomp_cascade_con%is_microbe(ibeg:ndecomp_pools)                     = .false.
        decomp_cascade_con%is_litter(ibeg:ndecomp_pools)                      = .false.
        decomp_cascade_con%is_soil(ibeg:ndecomp_pools)                        = .false.
+       decomp_cascade_con%is_doc(ibeg:ndecomp_pools)                         = .false.
        decomp_cascade_con%is_cwd(ibeg:ndecomp_pools)                         = .false.
        decomp_cascade_con%initial_cn_ratio(ibeg:ndecomp_pools)               = nan
        decomp_cascade_con%initial_stock(ibeg:ndecomp_pools)                  = nan

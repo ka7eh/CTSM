@@ -33,11 +33,13 @@ module SoilBiogeochemCarbonFluxType
      real(r8), pointer :: c_overflow_vr                             (:,:,:) ! vertically-resolved C rejected by microbes that cannot process it (gC/m3/s)
      real(r8), pointer :: decomp_cascade_hr_vr_col                  (:,:,:) ! vertically-resolved het. resp. from decomposing C pools (gC/m3/s)
      real(r8), pointer :: decomp_cascade_hr_col                     (:,:)   ! vertically-integrated (diagnostic) het. resp. from decomposing C pools (gC/m2/s)
+     real(r8), pointer :: decomp_cascade_doc_vr_col                 (:,:,:) ! vertically-resolved het. resp. from dissolved organic matter (gC/m3/s)
      real(r8), pointer :: decomp_cascade_ctransfer_vr_col           (:,:,:) ! vertically-resolved C transferred along deomposition cascade (gC/m3/s)
      real(r8), pointer :: decomp_cascade_ctransfer_col              (:,:)   ! vertically-integrated (diagnostic) C transferred along decomposition cascade (gC/m2/s)
      real(r8), pointer :: cn_col                                    (:,:)   ! (gC/gN) C:N ratio by pool
      real(r8), pointer :: litr_lig_c_to_n_col                       (:)     ! (gC/gN) Average of leaf, fine root, and CWD lignin C:N ratio
      real(r8), pointer :: rf_decomp_cascade_col                     (:,:,:) ! (frac) respired fraction in decomposition step
+     real(r8), pointer :: docf_decomp_cascade_col                   (:,:,:) ! (frac) doc fraction in decomposition step
      real(r8), pointer :: pathfrac_decomp_cascade_col               (:,:,:) ! (frac) what fraction of C passes from donor to receiver pool through a given transition
      real(r8), pointer :: decomp_k_col                              (:,:,:) ! rate coefficient for decomposition (1./sec)
      real(r8), pointer :: hr_vr_col                                 (:,:)   !  (gC/m3/s) total vertically-resolved het. resp. from decomposing C pools 
@@ -132,6 +134,9 @@ contains
      allocate(this%decomp_cascade_hr_col(begc:endc,1:ndecomp_cascade_transitions))                             
      this%decomp_cascade_hr_col(:,:)= nan
 
+     allocate(this%decomp_cascade_doc_vr_col(begc:endc,1:nlevdecomp_full,1:ndecomp_cascade_transitions))
+     this%decomp_cascade_doc_vr_col(:,:,:)= spval
+
      allocate(this%decomp_cascade_ctransfer_vr_col(begc:endc,1:nlevdecomp_full,1:ndecomp_cascade_transitions)) 
      this%decomp_cascade_ctransfer_vr_col(:,:,:)= nan
 
@@ -143,6 +148,9 @@ contains
 
      allocate(this%rf_decomp_cascade_col(begc:endc,1:nlevdecomp_full,1:ndecomp_cascade_transitions))
      this%rf_decomp_cascade_col(:,:,:) = nan
+
+     allocate(this%docf_decomp_cascade_col(begc:endc,1:nlevdecomp_full,1:ndecomp_cascade_transitions))
+     this%docf_decomp_cascade_col(:,:,:) = nan
 
      allocate(this%pathfrac_decomp_cascade_col(begc:endc,1:nlevdecomp_full,1:ndecomp_cascade_transitions))
      this%pathfrac_decomp_cascade_col(:,:,:) = nan
@@ -281,10 +289,12 @@ contains
 
         this%decomp_cascade_hr_col(begc:endc,:)             = spval
         this%decomp_cascade_hr_vr_col(begc:endc,:,:)        = spval
+        this%decomp_cascade_doc_vr_col(begc:endc,:,:)       = spval
         this%decomp_cascade_ctransfer_col(begc:endc,:)      = spval
         this%decomp_cascade_ctransfer_vr_col(begc:endc,:,:) = spval
         this%pathfrac_decomp_cascade_col(begc:endc,:,:)     = spval
         this%rf_decomp_cascade_col(begc:endc,:,:)           = spval
+        this%docf_decomp_cascade_col(begc:endc,:,:)         = spval
         do l = 1, ndecomp_cascade_transitions
 
            ! output the vertically integrated fluxes only as  default
@@ -388,6 +398,29 @@ contains
                     avgflag='A', long_name=longname, &
                     ptr_col=data2dptr, default='inactive')
               endif
+
+              ! output the vertically resolved DOC fluxes 
+              data2dptr => this%decomp_cascade_doc_vr_col(:,:,l)
+              ! check to see if there are multiple pathways that include respiration, and if so, note that in the history file
+              ii = 0
+              do jj = 1, ndecomp_cascade_transitions
+                 if ( decomp_cascade_con%cascade_donor_pool(jj) == decomp_cascade_con%cascade_donor_pool(l) ) ii = ii+1
+              end do
+              if ( ii == 1 ) then
+                 fieldname = &
+                    trim(decomp_cascade_con%decomp_pool_name_history(decomp_cascade_con%cascade_donor_pool(l))) &
+                    //'_DOC'//trim(vr_suffix)
+               else
+                  fieldname = &
+                     trim(decomp_cascade_con%decomp_pool_name_history(decomp_cascade_con%cascade_donor_pool(l)))//'_DOC_'// &
+                     trim(decomp_cascade_con%decomp_pool_name_short(decomp_cascade_con%cascade_receiver_pool(l))) &
+                     //trim(vr_suffix)
+               endif
+               longname =  'DOC. Resp. from '//&
+                  trim(decomp_cascade_con%decomp_pool_name_long(decomp_cascade_con%cascade_donor_pool(l)))
+               call hist_addfld_decomp (fname=fieldname, units='gC/m^3/s',  type2d='levdcmp', &
+                  avgflag='A', long_name=longname, &
+                  ptr_col=data2dptr, default='active')
            end if
 
         end do
@@ -751,10 +784,12 @@ contains
              this%decomp_cascade_hr_col(i,l)             = value_column
              this%c_overflow_vr(i,j,l)                   = value_column
              this%decomp_cascade_hr_vr_col(i,j,l)        = value_column
+             this%decomp_cascade_doc_vr_col(i,j,l)       = value_column
              this%decomp_cascade_ctransfer_col(i,l)      = value_column
              this%decomp_cascade_ctransfer_vr_col(i,j,l) = value_column
              this%pathfrac_decomp_cascade_col(i,j,l)     = value_column
              this%rf_decomp_cascade_col(i,j,l)           = value_column
+             this%docf_decomp_cascade_col(i,j,l)         = value_column
           end do
        end do
     end do

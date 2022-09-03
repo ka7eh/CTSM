@@ -25,8 +25,9 @@ module SoilBiogeochemCarbonStateType
   type, public :: soilbiogeochem_carbonstate_type
      
      ! all c pools involved in decomposition
-     real(r8), pointer :: decomp_cpools_vr_col (:,:,:) ! (gC/m3) vertically-resolved decomposing (litter, cwd, soil) c pools
+     real(r8), pointer :: decomp_cpools_vr_col (:,:,:) ! (gC/m3) vertically-resolved decomposing (litter, cwd, soil, doc) c pools
      real(r8), pointer :: decomp_soilc_vr_col  (:,:)   ! (gC/m3) vertically-resolved decomposing total soil c pool
+     real(r8), pointer :: decomp_doc_vr_col    (:,:)   ! (gC/m3) vertically-resolved decomposing total doc pool
      real(r8), pointer :: ctrunc_vr_col        (:,:)   ! (gC/m3) vertically-resolved column-level sink for C truncation
 
      ! summary (diagnostic) state variables, not involved in mass balance
@@ -36,9 +37,10 @@ module SoilBiogeochemCarbonStateType
      real(r8), pointer :: totlitc_1m_col          (:)     ! (gC/m2) total litter carbon to 1 meter
      real(r8), pointer :: totsomc_col             (:)     ! (gC/m2) total soil organic matter carbon
      real(r8), pointer :: totsomc_1m_col          (:)     ! (gC/m2) total soil organic matter carbon to 1 meter
+     real(r8), pointer :: totdoc_col              (:)     ! (gC/m2) total dissolved organic carbon
      real(r8), pointer :: cwdc_col                (:)     ! (gC/m2) coarse woody debris C (diagnostic)
      real(r8), pointer :: decomp_cpools_1m_col    (:,:)   ! (gC/m2)  Diagnostic: decomposing (litter, cwd, soil) c pools to 1 meter
-     real(r8), pointer :: decomp_cpools_col       (:,:)   ! (gC/m2)  decomposing (litter, cwd, soil) c pools
+     real(r8), pointer :: decomp_cpools_col       (:,:)   ! (gC/m2)  decomposing (litter, cwd, soil, doc) c pools
      real(r8), pointer :: dyn_cbal_adjustments_col(:)     ! (gC/m2) adjustments to each column made in this timestep via dynamic column area adjustments (note: this variable only makes sense at the column-level: it is meaningless if averaged to the gridcell-level)
      integer           :: restart_file_spinup_state       ! spinup state as read from restart file, for determining whether to enter or exit spinup mode.
      real(r8)          :: totvegcthresh                   ! threshold for total vegetation carbon to zero out decomposition pools
@@ -115,6 +117,9 @@ contains
     allocate(this%decomp_soilc_vr_col(begc:endc,1:nlevdecomp_full))  
     this%decomp_soilc_vr_col(:,:)= nan
 
+    allocate(this%decomp_doc_vr_col(begc:endc,1:nlevdecomp_full))  
+    this%decomp_doc_vr_col(:,:) = nan
+
     allocate(this%ctrunc_col     (begc :endc)) ; this%ctrunc_col     (:) = nan
     if ( .not. use_fates ) then
        allocate(this%cwdc_col       (begc :endc)) ; this%cwdc_col       (:) = nan
@@ -122,6 +127,7 @@ contains
     allocate(this%totmicc_col    (begc :endc)) ; this%totmicc_col    (:) = nan
     allocate(this%totlitc_col    (begc :endc)) ; this%totlitc_col    (:) = nan
     allocate(this%totsomc_col    (begc :endc)) ; this%totsomc_col    (:) = nan
+    allocate(this%totdoc_col     (begc :endc)) ; this%totdoc_col     (:) = nan
     allocate(this%totlitc_1m_col (begc :endc)) ; this%totlitc_1m_col (:) = nan
     allocate(this%totsomc_1m_col (begc :endc)) ; this%totsomc_1m_col (:) = nan
     allocate(this%dyn_cbal_adjustments_col (begc:endc)) ; this%dyn_cbal_adjustments_col (:) = nan
@@ -220,6 +226,11 @@ contains
        call hist_addfld1d (fname='TOTSOMC', units='gC/m^2', &
             avgflag='A', long_name='total soil organic matter carbon', &
             ptr_col=this%totsomc_col)
+
+       this%totdoc_col(begc:endc) = spval
+       call hist_addfld1d (fname='TOTDOC', units='gC/m^2', &
+            avgflag='A', long_name='total dissolved organic carbon', &
+            ptr_col=this%totdoc_col)
 
        if ( nlevdecomp_full > 1 ) then
           this%totlitc_1m_col(begc:endc) = spval
@@ -528,6 +539,7 @@ contains
              this%totmicc_col(c)    = 0._r8
              this%totlitc_col(c)    = 0._r8
              this%totsomc_col(c)    = 0._r8
+             this%totdoc_col(c)     = 0._r8
              this%totlitc_1m_col(c) = 0._r8
              this%totsomc_1m_col(c) = 0._r8
           end if
@@ -818,6 +830,7 @@ contains
        this%totlitc_1m_col(i) = value_column
        this%totsomc_col(i)    = value_column
        this%totsomc_1m_col(i) = value_column
+       this%totdoc_col(i)     = value_column
     end do
 
     do j = 1,nlevdecomp_full
@@ -961,6 +974,27 @@ contains
        end do
     end if
 
+    ! Add doc carbon pools together to produce vertically-resolved decomposing total doc pool
+    if ( nlevdecomp_full > 1 ) then
+      do j = 1, nlevdecomp
+         do fc = 1,num_allc
+            c = filter_allc(fc)
+            this%decomp_doc_vr_col(c,j) = 0._r8
+         end do
+      end do
+      do l = 1, ndecomp_pools
+         if ( decomp_cascade_con%is_doc(l) ) then
+            do j = 1, nlevdecomp
+               do fc = 1,num_allc
+                  c = filter_allc(fc)
+                  this%decomp_doc_vr_col(c,j) = this%decomp_doc_vr_col(c,j) + &
+                       this%decomp_cpools_vr_col(c,j,l)
+               end do
+            end do
+         end if
+      end do
+   end if
+
     ! truncation carbon
     do fc = 1,num_allc
        c = filter_allc(fc)
@@ -1048,6 +1082,20 @@ contains
              this%totsomc_col(c) = this%totsomc_col(c) + this%decomp_cpools_col(c,l)
           end do
        end if
+    end do
+
+    ! total dissolved organic carbon (TOTDOC)
+    do fc = 1,num_allc
+      c = filter_allc(fc)
+      this%totdoc_col(c) = 0._r8
+    end do
+    do l = 1, ndecomp_pools
+      if ( decomp_cascade_con%is_doc(l) ) then
+         do fc = 1,num_allc
+            c = filter_allc(fc)
+            this%totdoc_col(c) = this%totdoc_col(c) + this%decomp_cpools_col(c,l)
+         end do
+      end if
     end do
 
     ! coarse woody debris carbon

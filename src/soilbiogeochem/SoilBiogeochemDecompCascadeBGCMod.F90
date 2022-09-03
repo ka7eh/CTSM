@@ -10,7 +10,7 @@ module SoilBiogeochemDecompCascadeBGCMod
   use shr_const_mod                      , only : SHR_CONST_TKFRZ
   use shr_log_mod                        , only : errMsg => shr_log_errMsg
   use clm_varpar                         , only : nlevdecomp, ndecomp_pools_max
-  use clm_varpar                         , only : i_litr_min, i_litr_max, i_met_lit, i_cwd, i_cwdl2
+  use clm_varpar                         , only : i_litr_min, i_litr_max, i_met_lit, i_cwd, i_cwdl2, i_doc_l, i_doc_r
   use clm_varctl                         , only : iulog, spinup_state, anoxia, use_lch4, use_fates
   use clm_varcon                         , only : zsoi
   use decompMod                          , only : bounds_type
@@ -63,6 +63,20 @@ module SoilBiogeochemDecompCascadeBGCMod
   real(r8), private :: f_s2s1
   real(r8), private :: f_s2s3
 
+  real(r8) :: docf_l1s1
+  real(r8) :: docf_l2s1
+  real(r8) :: docf_l3s2
+
+  real(r8), allocatable :: docf_s1s2(:,:)
+  real(r8), allocatable :: docf_s1s3(:,:)
+
+  real(r8) :: docf_s2s1
+  real(r8) :: docf_s2s3
+  real(r8) :: docf_s3s1
+
+  real(r8) :: docf_cwdl2
+  real(r8) :: docf_cwdl3
+
   integer, private :: i_l1s1
   integer, private :: i_l2s1
   integer, private :: i_l3s2
@@ -87,6 +101,17 @@ module SoilBiogeochemDecompCascadeBGCMod
      real(r8):: rf_s3s1_bgc    
 
      real(r8):: rf_cwdl3_bgc
+
+     real(r8) :: docf_l1s1_bgc
+     real(r8) :: docf_l2s1_bgc
+     real(r8) :: docf_l3s2_bgc
+
+     real(r8) :: docf_s2s1_bgc
+     real(r8) :: docf_s2s3_bgc
+     real(r8) :: docf_s3s1_bgc
+
+     real(r8) :: docf_cwdl2_bgc
+     real(r8) :: docf_cwdl3_bgc
 
      real(r8):: tau_l1_bgc    ! 1/turnover time of  litter 1 from Century (l/18.5) (1/yr)
      real(r8):: tau_l2_l3_bgc ! 1/turnover time of  litter 2 and litter 3 from Century (1/4.9) (1/yr)
@@ -205,6 +230,46 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%rf_cwdl3_bgc=tempr
 
+    tString='rf_l1s1_bgc'
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%docf_l1s1_bgc=tempr
+
+    tString='rf_l2s1_bgc'
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%docf_l2s1_bgc=tempr
+
+    tString='rf_l3s2_bgc'
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%docf_l3s2_bgc=tempr   
+
+    tString='rf_s2s1_bgc'
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%docf_s2s1_bgc=tempr
+
+    tString='rf_s2s3_bgc'
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%docf_s2s3_bgc=tempr
+
+    tString='rf_s3s1_bgc'
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%docf_s3s1_bgc=tempr
+
+    tString='rf_cwdl2_bgc'
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%docf_cwdl2_bgc=tempr
+
+    tString='rf_cwdl3_bgc'
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%docf_cwdl3_bgc=tempr
+
     tString='bgc_cwd_fcel'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
@@ -255,6 +320,7 @@ contains
          floating_cn_ratio_decomp_pools => decomp_cascade_con%floating_cn_ratio_decomp_pools     , & ! Output: [logical           (:)     ]  TRUE => pool has fixed C:N ratio                          
          is_litter                      => decomp_cascade_con%is_litter                          , & ! Output: [logical           (:)     ]  TRUE => pool is a litter pool                             
          is_soil                        => decomp_cascade_con%is_soil                            , & ! Output: [logical           (:)     ]  TRUE => pool is a soil pool                               
+         is_doc                         => decomp_cascade_con%is_doc                             , & ! Output: [logical           (:)     ]  TRUE => pool is a DOC pool
          is_cwd                         => decomp_cascade_con%is_cwd                             , & ! Output: [logical           (:)     ]  TRUE => pool is a cwd pool                                
          initial_cn_ratio               => decomp_cascade_con%initial_cn_ratio                   , & ! Output: [real(r8)          (:)     ]  c:n ratio for initialization of pools                    
          initial_stock                  => decomp_cascade_con%initial_stock                      , & ! Output: [real(r8)          (:)     ]  initial concentration for seeding at spinup              
@@ -268,6 +334,8 @@ contains
 
       allocate(rf_s1s2(bounds%begc:bounds%endc,1:nlevdecomp))
       allocate(rf_s1s3(bounds%begc:bounds%endc,1:nlevdecomp))
+      allocate(docf_s1s2(bounds%begc:bounds%endc,1:nlevdecomp))
+      allocate(docf_s1s3(bounds%begc:bounds%endc,1:nlevdecomp))
       allocate(f_s1s2(bounds%begc:bounds%endc,1:nlevdecomp))
       allocate(f_s1s3(bounds%begc:bounds%endc,1:nlevdecomp))
 
@@ -287,6 +355,16 @@ contains
 
       rf_cwdl3 = params_inst%rf_cwdl3_bgc
 
+      docf_l1s1 = params_inst%docf_l1s1_bgc
+      docf_l2s1 = params_inst%docf_l2s1_bgc
+      docf_l3s2 = params_inst%docf_l3s2_bgc
+      docf_s2s1 = params_inst%docf_s2s1_bgc
+      docf_s2s3 = params_inst%docf_s2s3_bgc
+      docf_s3s1 = params_inst%docf_s3s1_bgc
+
+      docf_cwdl2 = params_inst%docf_cwdl2_bgc
+      docf_cwdl3 = params_inst%docf_cwdl3_bgc
+
       ! set the cellulose and lignin fractions for coarse woody debris
       cwd_fcel = params_inst%cwd_fcel_bgc
 
@@ -302,6 +380,13 @@ contains
             f_s1s3(c,j) = .004_r8 / (1._r8 - t)
             rf_s1s2(c,j) = t
             rf_s1s3(c,j) = t
+            if (j == 1) then
+               docf_s1s2(c,j) = 0.0007143_r8
+               docf_s1s3(c,j) = 0.000143_r8
+            else
+               docf_s1s2(c,j) = 0._r8
+               docf_s1s3(c,j) = 0._r8
+            end if
          end do
       end do
       initial_stock_soildepth = params_inst%bgc_initial_Cstocks_depth
@@ -316,6 +401,7 @@ contains
       decomp_cascade_con%decomp_pool_name_short(i_met_lit) = 'L1'
       is_litter(i_met_lit) = .true.
       is_soil(i_met_lit) = .false.
+      is_doc(i_met_lit) = .false.
       is_cwd(i_met_lit) = .false.
       initial_cn_ratio(i_met_lit) = 90._r8
       initial_stock(i_met_lit) = params_inst%bgc_initial_Cstocks(i_met_lit)
@@ -331,6 +417,7 @@ contains
       decomp_cascade_con%decomp_pool_name_short(i_cel_lit) = 'L2'
       is_litter(i_cel_lit) = .true.
       is_soil(i_cel_lit) = .false.
+      is_doc(i_cel_lit) = .false.
       is_cwd(i_cel_lit) = .false.
       initial_cn_ratio(i_cel_lit) = 90._r8
       initial_stock(i_cel_lit) = params_inst%bgc_initial_Cstocks(i_cel_lit)
@@ -346,6 +433,7 @@ contains
       decomp_cascade_con%decomp_pool_name_short(i_lig_lit) = 'L3'
       is_litter(i_lig_lit) = .true.
       is_soil(i_lig_lit) = .false.
+      is_doc(i_lig_lit) = .false.
       is_cwd(i_lig_lit) = .false.
       initial_cn_ratio(i_lig_lit) = 90._r8
       initial_stock(i_lig_lit) = params_inst%bgc_initial_Cstocks(i_lig_lit)
@@ -371,6 +459,7 @@ contains
       decomp_cascade_con%decomp_pool_name_short(i_act_som) = 'S1'
       is_litter(i_act_som) = .false.
       is_soil(i_act_som) = .true.
+      is_doc(i_act_som) = .false.
       is_cwd(i_act_som) = .false.
       initial_cn_ratio(i_act_som) = cn_s1
       initial_stock(i_act_som) = params_inst%bgc_initial_Cstocks(i_act_som)
@@ -386,6 +475,7 @@ contains
       decomp_cascade_con%decomp_pool_name_short(i_slo_som) = 'S2'
       is_litter(i_slo_som) = .false.
       is_soil(i_slo_som) = .true.
+      is_doc(i_slo_som) = .false.
       is_cwd(i_slo_som) = .false.
       initial_cn_ratio(i_slo_som) = cn_s2
       initial_stock(i_slo_som) = params_inst%bgc_initial_Cstocks(i_slo_som)
@@ -401,6 +491,7 @@ contains
       decomp_cascade_con%decomp_pool_name_short(i_pas_som) = 'S3'
       is_litter(i_pas_som) = .false.
       is_soil(i_pas_som) = .true.
+      is_doc(i_pas_som) = .false.
       is_cwd(i_pas_som) = .false.
       initial_cn_ratio(i_pas_som) = cn_s3
       initial_stock(i_pas_som) = params_inst%bgc_initial_Cstocks(i_pas_som)
@@ -418,6 +509,7 @@ contains
          decomp_cascade_con%decomp_pool_name_short(i_cwd) = 'CWD'
          is_litter(i_cwd) = .false.
          is_soil(i_cwd) = .false.
+         is_doc(i_cwd) = .false.
          is_cwd(i_cwd) = .true.
          initial_cn_ratio(i_cwd) = 90._r8
          initial_stock(i_cwd) = params_inst%bgc_initial_Cstocks(i_cwd)
@@ -425,6 +517,42 @@ contains
          is_cellulose(i_cwd) = .false.
          is_lignin(i_cwd) = .false.
       endif
+
+      if (.not. use_fates) then
+         i_doc_l = i_cwd + 1
+      else
+         i_doc_l = i_pas_som + 1
+      endif
+      floating_cn_ratio_decomp_pools(i_doc_l) = .false.
+      decomp_cascade_con%decomp_pool_name_restart(i_doc_l) = 'doc_labi'
+      decomp_cascade_con%decomp_pool_name_history(i_doc_l) = 'DOC_LABI'
+      decomp_cascade_con%decomp_pool_name_long(i_doc_l) = 'labile dissolved organic carbon'
+      decomp_cascade_con%decomp_pool_name_short(i_doc_l) = 'DL'
+      is_litter(i_doc_l) = .false.
+      is_soil(i_doc_l) = .false.
+      is_doc(i_doc_l) = .true.
+      is_cwd(i_doc_l) = .false.
+      initial_cn_ratio(i_doc_l) = 90_r8
+      initial_stock(i_doc_l) = 0
+      is_metabolic(i_doc_l) = .false.
+      is_cellulose(i_doc_l) = .false.
+      is_lignin(i_doc_l) = .false.
+
+      i_doc_r = i_doc_l + 1
+      floating_cn_ratio_decomp_pools(i_doc_r) = .false.
+      decomp_cascade_con%decomp_pool_name_restart(i_doc_r) = 'doc_rec'
+      decomp_cascade_con%decomp_pool_name_history(i_doc_r) = 'DOC_REC'
+      decomp_cascade_con%decomp_pool_name_long(i_doc_r) = 'Recalcitrant dissolved organic carbon'
+      decomp_cascade_con%decomp_pool_name_short(i_doc_r) = 'DR'
+      is_litter(i_doc_r) = .false.
+      is_soil(i_doc_r) = .false.
+      is_doc(i_doc_r) = .true.
+      is_cwd(i_doc_r) = .false.
+      initial_cn_ratio(i_doc_r) = 90_r8
+      initial_stock(i_doc_r) = 0 ! TODO: params_inst%bgc_initial_Cstocks(i_pas_som)
+      is_metabolic(i_doc_r) = .false.
+      is_cellulose(i_doc_r) = .false.
+      is_lignin(i_doc_r) = .false.
 
       speedup_fac = 1._r8
 
@@ -580,6 +708,7 @@ contains
          o2stress_unsat => ch4_inst%o2stress_unsat_col                 , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          finundated     => ch4_inst%finundated_col                     , & ! Input:  [real(r8) (:)     ]  fractional inundated area                                
          rf_decomp_cascade       => soilbiogeochem_carbonflux_inst%rf_decomp_cascade_col                                                               , & ! Output: [real(r8) (:,:,:) ]  respired fraction in decomposition step (frac)
+         docf_decomp_cascade     => soilbiogeochem_carbonflux_inst%docf_decomp_cascade_col                                                             , & ! Output: [real(r8) (:,:,:) ]  doc fraction in decomposition step (frac)
          pathfrac_decomp_cascade => soilbiogeochem_carbonflux_inst%pathfrac_decomp_cascade_col                                                         , & ! Output: [real(r8) (:,:,:) ]  what fraction of C passes from donor to receiver pool through a given transition (frac)
          t_scalar       => soilbiogeochem_carbonflux_inst%t_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil temperature scalar for decomp                     
          w_scalar       => soilbiogeochem_carbonflux_inst%w_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil water scalar for decomp                           
@@ -926,6 +1055,17 @@ contains
       rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s2s1) = rf_s2s1
       rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s2s3) = rf_s2s3
       rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s3s1) = rf_s3s1
+
+      docf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_l1s1) = rf_l1s1
+      docf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_l2s1) = rf_l2s1
+      docf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_l3s2) = rf_l3s2
+      docf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s1s2) = docf_s1s2(bounds%begc:bounds%endc,1:nlevdecomp)
+      docf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s1s3) = docf_s1s3(bounds%begc:bounds%endc,1:nlevdecomp)
+      docf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s2s1) = rf_s2s1
+      docf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s2s3) = rf_s2s3
+      docf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s3s1) = rf_s3s1
+      docf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_cwdl2) = docf_cwdl2
+      docf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_cwdl3) = docf_cwdl3
 
     end associate
 
